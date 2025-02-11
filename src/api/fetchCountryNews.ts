@@ -1,41 +1,30 @@
-interface News {
-  title: string;
-  description: string;
-  url: string;
-  urlToImage: string;
-  author: string;
-  content: string;
-  publishedAt: string;
-}
-
-const API_KEY = import.meta.env.VITE_NEWS_API_KEY;
-
 export async function fetchCountryNews() {
+  const API_KEY = import.meta.env.VITE_NEWS_API_KEY;
+
+  if (!API_KEY) {
+    console.error("❌ Missing API Key: Please check your .env file");
+    return { articles: [] };
+  }
+
   const NEWS_API_URL = `https://newsapi.org/v2/top-headlines?category=business&language=en&apiKey=${API_KEY}`;
 
   try {
-    const response = await fetch(NEWS_API_URL);
-    const data: { articles: Partial<News>[]; status: string } = await response.json();
+    const response = await fetch(NEWS_API_URL, {
+      headers: {
+        "User-Agent": "Mozilla/5.0", // ✅ Required by some APIs to avoid 426 error
+      },
+    });
 
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
     if (data.status !== "ok") throw new Error("Failed to fetch news");
 
-    // ✅ Ensure all required fields exist, providing fallback values
-    const validArticles: News[] = data.articles
-      .filter((article) => article.urlToImage && !article.urlToImage.includes("default.jpg") && !article.urlToImage.includes("no-image.png"))
-      .map((article) => ({
-        title: article.title || "No Title",
-        description: article.description || "No description available",
-        url: article.url || "#",
-        urlToImage: article.urlToImage || "",
-        author: article.author || "Unknown",
-        content: article.content || "Content not available",
-        publishedAt: article.publishedAt || "Unknown date",
-      }));
-
-    return { articles: validArticles };
+    return { articles: data.articles || [] };
   } catch (error) {
     console.error("❌ News Fetch Error:", error);
-    throw error;
+    return { articles: [] };
   }
 }
-
