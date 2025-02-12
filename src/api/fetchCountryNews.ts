@@ -1,17 +1,29 @@
-export async function fetchCountryNews() {
-  const API_KEY = import.meta.env.VITE_NEWS_API_KEY;
+// ✅ Define the correct TypeScript interface for NewsArticle
+interface NewsArticle {
+  source: { name: string }; // ✅ Added source name
+  title: string;
+  description?: string;
+  url: string;
+  urlToImage?: string;
+  author?: string;
+  content?: string;
+  publishedAt?: string;
+}
 
-  if (!API_KEY) {
-    console.error("❌ Missing API Key: Please check your .env file");
-    return { articles: [] };
-  }
+// ✅ Ensure the API key is loaded correctly
+const API_KEY = import.meta.env.VITE_NEWS_API_KEY;
 
+if (!API_KEY) {
+  console.error("❌ ERROR: Missing API Key. Check .env file or Vercel settings.");
+}
+
+export async function fetchCountryNews(): Promise<{ articles: NewsArticle[] }> {
   const NEWS_API_URL = `https://newsapi.org/v2/top-headlines?category=business&language=en&apiKey=${API_KEY}`;
 
   try {
     const response = await fetch(NEWS_API_URL, {
       headers: {
-        "User-Agent": "Mozilla/5.0", // ✅ Required by some APIs to avoid 426 error
+        "User-Agent": "Mozilla/5.0", // ✅ Prevents 426 errors
       },
     });
 
@@ -19,12 +31,23 @@ export async function fetchCountryNews() {
       throw new Error(`API request failed with status ${response.status}`);
     }
 
-    const data = await response.json();
-    if (data.status !== "ok") throw new Error("Failed to fetch news");
+    const data: { articles: NewsArticle[]; status: string } = await response.json();
 
-    return { articles: data.articles || [] };
+    if (data.status !== "ok") {
+      throw new Error("News API responded with an error");
+    }
+
+    // ✅ Filter out invalid articles (without images)
+    const validArticles = data.articles.filter(
+      (article: NewsArticle) =>
+        article.urlToImage &&
+        !article.urlToImage.includes("default.jpg") &&
+        !article.urlToImage.includes("no-image.png")
+    );
+
+    return { articles: validArticles };
   } catch (error) {
     console.error("❌ News Fetch Error:", error);
-    return { articles: [] };
+    return { articles: [] }; // ✅ Always return an array to prevent crashes
   }
 }
